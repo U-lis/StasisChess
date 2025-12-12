@@ -95,7 +95,7 @@ class Queen(Piece):
         super().__init__(pid, 'queen', color, pos)
 
     def can_move(self, frm, to, board):
-        r = Rook(self.id,self.color); b = Bishop(self.id,self.color)
+        r = Rook('temp',self.color); b = Bishop('temp',self.color)
         return r.can_move(frm,to,board) or b.can_move(frm,to,board)
 
 class King(Piece):
@@ -136,7 +136,10 @@ class Game:
     def init_piece(self):
         def add_piece(ptype, cnt, color):
             for i in range(cnt):
-                pid = f"{color}_{ptype[0].upper()}{i}"
+                abbr = ptype[0].upper()
+                if ptype == 'knight':
+                    abbr = 'N'
+                pid = f"{color}_{abbr}{i}"
                 piece = None
                 if ptype=='pawn': piece = Pawn(pid,color)
                 elif ptype=='rook': piece = Rook(pid,color)
@@ -178,13 +181,13 @@ class Game:
         return self.pieces.get(id)
 
     def drop_piece(self, player_color, id, x,y):
-        if not self.first_turn_done[player_color]:
-            return False, "drop king first"
         if id not in self.hands[player_color]:
             return False, "you don't own that piece"
+        p = self.pieces[id]
+        if not self.first_turn_done[player_color] and p.type != 'king':
+            return False, "drop king first"
         if not (0<=x<8 and 0<=y<8): return False, "invalid coords"
         if self.board[y][x]: return False, "target occupied"
-        p = self.pieces[id]
         if p.type=='pawn':
             # 폰은 각 플레이어 기준 맨 끝 랭크에 착수할 수 없다.
             if player_color=='w' and y==7: return False, "white cannot drop pawn on last rank"
@@ -256,7 +259,15 @@ class Game:
         self.turn = 'b' if self.turn=='w' else 'w'
         self.action_done = {}
 
-game = Game()
+# --- Game Management ---
+games = {}
+player_game_map = {}
+
+def get_game_for_player(sid):
+    game_id = player_game_map.get(sid)
+    if game_id:
+        return games.get(game_id)
+    return None
 
 # ---------------------------
 # SocketIO events
@@ -264,22 +275,38 @@ game = Game()
 @socketio.on('connect')
 def on_connect():
     sid = request.sid
-    print("connect", sid)
-    emit('connected', {'sid': sid})
-    # send initial state
+    print(f"connect {sid}")
+    # For this refactoring, we create a new game for each connection.
+    # A real implementation would have a lobby, game creation, and joining logic.
+    game = Game()
+    games[game.id] = game
+    player_game_map[sid] = game.id
+    join_room(game.id)
+    
+    emit('connected', {'sid': sid, 'game_id': game.id})
+    # send initial state for the new game
     emit('game_state', game.to_json())
 
-@socketio.on('join_room')
+@socketio.on('join_game') # A new event to handle rejoining/multiple players
 def on_join(data):
-    room = data.get('room','main')
-    join_room(room)
-    emit('joined', {'room': room}, to=request.sid)
+    sid = request.sid
+    game_id = data.get('game_id')
+    game = games.get(game_id)
+    if game:
+        player_game_map[sid] = game_id
+        join_room(game.id)
+        emit('joined', {'game_id': game.id}, to=sid)
+        socketio.emit('game_state', game.to_json(), to=game.id)
+    else:
+        emit('error', {'reason': 'game_not_found'}, to=sid)
 
 @socketio.on('move_request')
 def on_move_request(data):
     sid = request.sid
-    player_sid = sid
-    # client must send: {player_color, piece_id, from: [x,y], to: [x,y]}
+    game = get_game_for_player(sid)
+    if not game:
+        emit('move_rejected', {'reason': 'game_not_found'}, to=sid); return
+        
     player_color = data.get('player_color')
     pid = data.get('piece_id')
     frm = tuple(data.get('from'))
@@ -289,23 +316,19 @@ def on_move_request(data):
     if player_color != game.turn:
         emit('move_rejected', {'reason': 'not_your_turn'}, to=sid); return
 
-    # enforce one action per turn if we track by player identity socket -> action_done keyed by player_color
     if game.action_done.get(player_color):
         emit('move_rejected', {'reason':'already_moved_this_turn'}, to=sid); return
 
-    # basic existence
     piece = game.get_piece(pid)
     if piece is None:
         emit('move_rejected', {'reason':'no_such_piece'}, to=sid); return
 
-    # stun/move_stack checks
     if piece.stun > 0:
         emit('move_rejected', {'reason':'stunned','stun': piece.stun}, to=sid); return
-    # If you want to require move_stack>0 to allow multi-move, check here (we allow default single move)
-    # legality
+    
     if not piece.can_move(frm,to,game.board_pieces()):
         emit('move_rejected', {'reason':'illegal_move'}, to=sid); return
-    # suicide check
+    
     if not game.safe_after_move(pid, frm, to):
         emit('move_rejected', {'reason':'suicide_or_king_lost'}, to=sid); return
 
@@ -313,15 +336,17 @@ def on_move_request(data):
     if not ok:
         emit('move_rejected', {'reason':msg}, to=sid); return
 
-    # mark action done
     game.action_done[player_color] = True
-    # broadcast updated state
-    socketio.emit('move_accepted', {'by': player_color, 'move': {'piece':pid,'from':frm,'to':to}})
-    socketio.emit('game_state', game.to_json())
+    socketio.emit('move_accepted', {'by': player_color, 'move': {'piece':pid,'from':frm,'to':to}}, to=game.id)
+    socketio.emit('game_state', game.to_json(), to=game.id)
 
 @socketio.on('drop_request')
 def on_drop_request(data):
     sid = request.sid
+    game = get_game_for_player(sid)
+    if not game:
+        emit('drop_rejected', {'reason': 'game_not_found'}, to=sid); return
+
     player_color = data.get('player_color')
     pid = data.get('piece_id')
     to = tuple(data.get('to'))
@@ -336,16 +361,33 @@ def on_drop_request(data):
         emit('drop_rejected', {'reason':msg}, to=sid); return
 
     game.action_done[player_color] = True
-    socketio.emit('drop_accepted', {'by': player_color, 'piece': pid, 'to': to})
-    socketio.emit('game_state', game.to_json())
+    socketio.emit('drop_accepted', {'by': player_color, 'piece': pid, 'to': to}, to=game.id)
+    socketio.emit('game_state', game.to_json(), to=game.id)
 
 @socketio.on('end_turn')
 def on_end_turn():
     sid = request.sid
-    # just rotate turn and update stacks
+    game = get_game_for_player(sid)
+    if not game:
+        # Or just log an error, since there's no specific client to reject to.
+        print(f"end_turn requested by {sid} but no game found.")
+        return
+
     game.end_turn()
-    socketio.emit('turn_ended', {'turn': game.turn})
-    socketio.emit('game_state', game.to_json())
+    socketio.emit('turn_ended', {'turn': game.turn}, to=game.id)
+    socketio.emit('game_state', game.to_json(), to=game.id)
+
+@socketio.on('disconnect')
+def on_disconnect():
+    sid = request.sid
+    print(f"disconnect {sid}")
+    game_id = player_game_map.pop(sid, None)
+    if game_id:
+        game = games.get(game_id)
+        # Optional: Implement logic to handle player disconnection, 
+        # e.g., pause game, notify other player, or clean up game if empty.
+        # For now, we'll just remove the player from the map.
+        pass
 
 # basic http endpoint
 @app.route('/ping')
