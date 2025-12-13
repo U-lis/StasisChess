@@ -1,11 +1,16 @@
 # server/app.py
+import os
+
+from dotenv import load_dotenv
 from flask import Flask, request
 from flask_socketio import SocketIO, emit, join_room
 
 from game import Game
 
+load_dotenv()
+
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'dev'
+app.config['SECRET_KEY'] = os.getenv("FLASK_SECRET_KEY")
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # --- Game Management ---
@@ -157,10 +162,12 @@ def on_disconnect():
         # For now, we'll just remove the player from the map.
         pass
 
+
 # basic http endpoint
 @app.route('/ping')
 def ping():
     return {"ok": True}
 
+
 if __name__ == "__main__":
-    socketio.run(app, host='0.0.0.0', port=5000,debug=True)
+    socketio.run(app, host=os.getenv("HOST"), port=int(os.getenv("PORT")), debug=os.getenv("DEBUG") == "True")
