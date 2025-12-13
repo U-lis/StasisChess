@@ -340,6 +340,9 @@ def on_move_request(data):
     if piece.stun > 0:
         emit('move_rejected', {'reason':'stunned','stun': piece.stun}, to=sid); return
     
+    if piece.move_stack < 1:
+        emit('move_rejected', {'reason':'move_stack_is_0'}); return
+    
     if not piece.can_move(frm,to,game.board_pieces()):
         emit('move_rejected', {'reason':'illegal_move'}, to=sid); return
     
@@ -390,6 +393,20 @@ def on_end_turn():
 
     game.end_turn()
     socketio.emit('turn_ended', {'turn': game.turn}, to=game.id)
+    socketio.emit('game_state', game.to_json(), to=game.id)
+
+@socketio.on('stack_add')
+def on_stack_add(data):
+    sid = request.sid
+    game = get_game_for_player(sid)
+    if not game:
+        emit('stack_rejected', {'reason': 'game_not_found'}, to=sid); return
+    id = data.get('piece_id')
+    p = game.get_piece(id)
+    p.stun += 1
+    if game.action_done.get(p.color):
+        emit('move_rejected', {'reason':'already_moved_this_turn'}, to=sid); return
+    game.action_done[p.color] = True
     socketio.emit('game_state', game.to_json(), to=game.id)
 
 @socketio.on('disconnect')

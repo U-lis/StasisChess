@@ -8,44 +8,51 @@ export const useGame = () => {
   const [gameState, setGameState] = useState(null);
   const [log, setLog] = useState([]);
   const [selectedPiece, setSelectedPiece] = useState(null);
+  // const [confirmedPiece, setConfirmedPiece] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [gameOver, setGameOver] = useState(false);
   const [winner, setWinner] = useState(null);
 
   useEffect(() => {
     socket.on("connected", (data) => {
-        console.log("connected", data.sid);
-        setGameId(data.game_id);
+      console.log("connected", data.sid);
+      setGameId(data.game_id);
     });
 
     socket.on("game_state", (g) => setGameState(g));
     socket.on("move_accepted", (d) => {
       setLog(l => [`Move accepted: ${JSON.stringify(d)}`, ...l]);
       setSelectedPiece(null);
+      // setConfirmedPiece(null);
     });
     socket.on("move_rejected", (d) => setLog(l => [`Move rejected: ${d.reason}`, ...l]));
     socket.on("drop_accepted", (d) => {
       setLog(l => [`Drop accepted: ${JSON.stringify(d)}`, ...l]);
       setSelectedPiece(null);
+      // setConfirmedPiece(null);
     });
     socket.on("drop_rejected", (d) => setLog(l => [`Drop rejected: ${d.reason}`, ...l]));
+    socket.on("selection_confirmed", (d) => setLog(l => [`Selection confirmed: ${JSON.stringify(d)}`, ...l]));
+    socket.on("selection_cancelled", (d) => setLog(l => [`Selection cancelled: ${JSON.stringify(d)}`, ...l]));
     socket.on("turn_ended", (d) => setLog(l => [`New turn: ${d.turn}'s move`, ...l]));
     socket.on("game_end", (data) => {
-        setLog(l => [`Game Over: ${data.winner} wins!`, ...l]);
-        setGameOver(true);
-        setWinner(data.winner);
-        setSelectedPiece(null);
+      setLog(l => [`Game Over: ${data.winner} wins!`, ...l]);
+      setGameOver(true);
+      setWinner(data.winner);
+      setSelectedPiece(null);
     });
 
     return () => {
-        socket.off("connected");
-        socket.off("game_state");
-        socket.off("move_accepted");
-        socket.off("move_rejected");
-        socket.off("drop_accepted");
-        socket.off("drop_rejected");
-        socket.off("turn_ended");
-        socket.off("game_end");
+      socket.off("connected");
+      socket.off("game_state");
+      socket.off("move_accepted");
+      socket.off("move_rejected");
+      socket.off("drop_accepted");
+      socket.off("drop_rejected");
+      socket.off("selection_confirmed");
+      socket.off("selection_cancelled");
+      socket.off("turn_ended");
+      socket.off("game_end");
     };
   }, []);
 
@@ -109,7 +116,16 @@ export const useGame = () => {
     if (gameOver) return;
     socket.emit("end_turn");
     setSelectedPiece(null);
+    // setConfirmedPiece(null);
   };
 
-  return { gameState, log, selectedPiece, gameId, gameOver, winner, handleSelect, handleSelectFromHand, endTurn };
+  const toggleConfirmSelection = () => {
+    if (gameOver) return;
+    if (selectedPiece) {
+      // setConfirmedPiece(selectedPiece);
+      socket.emit("stack_add", { piece_id: selectedPiece.id });
+      setSelectedPiece(null);
+    }
+  }
+  return { gameState, log, selectedPiece, gameId, gameOver, winner, handleSelect, handleSelectFromHand, endTurn, toggleConfirmSelection };
 };

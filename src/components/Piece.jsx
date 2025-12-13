@@ -43,7 +43,7 @@ export default function Piece({ type, color, stun, moveStack, onSelect, isSelect
       {(stun > 0 || moveStack > 0) && (
         <div style={stackStyle}>
           {`S:${stun}`}
-          {moveStack > 0 ? ` M:${moveStack}` : ''}
+          {`M:${moveStack}`}
         </div>
       )}
     </div>

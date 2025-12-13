@@ -7,7 +7,7 @@ import Hand from "./components/Hand";
 const styles = {
   root: { position: 'relative', display: 'flex', gap: '20px', zoom: '95%' },
   gameArea: { display: 'flex', flexDirection: 'column', gap: '10px' },
-  turnInfo: { marginTop: 10 },
+  turnInfo: { marginTop: 10, display: 'flex', alignItems: 'center', gap: '10px' },
   sideBar: { display: 'flex', flexDirection: 'column', gap: '20px' },
   log: { whiteSpace: 'pre-wrap', maxHeight: 300, overflow: 'auto', border: '1px solid #ccc', padding: 5 },
   gameOverOverlay: {
@@ -27,7 +27,19 @@ const styles = {
 };
 
 export default function App() {
-  const { gameState, log, selectedPiece, gameId, gameOver, winner, handleSelect, handleSelectFromHand, endTurn } = useGame();
+  const {
+    gameState,
+    log,
+    selectedPiece,
+    confirmedPiece,
+    gameId,
+    gameOver,
+    winner,
+    handleSelect,
+    handleSelectFromHand,
+    endTurn,
+    toggleConfirmSelection
+  } = useGame();
   const [showLog, setShowLog] = useState(false);
 
   if (!gameState) {
@@ -47,6 +59,12 @@ export default function App() {
         <Board pieces={gameState.pieces} onSelect={handleSelect} selectedPiece={selectedPiece} />
         <div style={styles.turnInfo}>
           <h3>Turn: {gameState.turn === 'w' ? 'White' : 'Black'}</h3>
+          <button
+            onClick={toggleConfirmSelection}
+            disabled={!selectedPiece && !confirmedPiece}
+          >
+            Add stun stack
+          </button>
           <button onClick={endTurn}>End Turn</button>
         </div>
       </div>
