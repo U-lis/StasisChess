@@ -1,4 +1,7 @@
+from collections import namedtuple
 from enum import Enum
+
+Position = namedtuple("Position", ["x", "y"])
 
 
 class Color(Enum):

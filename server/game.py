@@ -1,7 +1,7 @@
 import copy
 from uuid import uuid4
 
-from enums import Color, PieceType
+from enums import Color, PieceType, Position
 from piece import Piece
 
 
@@ -92,7 +92,7 @@ class Game:
         self.first_turn_done[player_color] = True
         return True, "dropped"
 
-    def move_piece(self, player_color, pid, frm, to):
+    def move_piece(self, player_color, pid, frm: Position, to: Position):
         x1, y1 = frm
         x2, y2 = to
 
