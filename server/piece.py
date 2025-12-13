@@ -1,19 +1,6 @@
-from enum import Enum
 from typing import Tuple
 
-
-class Color(Enum):
-    White = 'w'
-    Black = 'b'
-
-
-class PieceType(Enum):
-    Pawn = "pawn"
-    Rook = "rook"
-    Knight = "knight"
-    Bishop = "bishop"
-    Queen = "queen"
-    King = "king"
+from enums import Color, PieceType
 
 
 class Piece:
@@ -64,7 +51,7 @@ class Piece:
 
 class Knight(Piece):
     def __init__(self, pid, color, pos=None):
-        super().__init__(pid, PieceType.Knight, color, pos)
+        super().__init__(pid, PieceType.KNIGHT, color, pos)
 
     def can_move(self, frm, to, board):
         dx = abs(frm[0] - to[0])
@@ -74,7 +61,7 @@ class Knight(Piece):
 
 class Rook(Piece):
     def __init__(self, pid, color, pos=None):
-        super().__init__(pid, PieceType.Rook, color, pos)
+        super().__init__(pid, PieceType.ROOK, color, pos)
 
     def can_move(self, frm, to, board):
         if frm[0] != to[0] and frm[1] != to[1]: return False
@@ -90,7 +77,7 @@ class Rook(Piece):
 
 class Bishop(Piece):
     def __init__(self, pid, color, pos=None):
-        super().__init__(pid, PieceType.Bishop, color, pos)
+        super().__init__(pid, PieceType.BISHOP, color, pos)
 
     def can_move(self, frm, to, board):
         dx = to[0] - frm[0]
@@ -108,7 +95,7 @@ class Bishop(Piece):
 
 class Queen(Piece):
     def __init__(self, pid, color, pos=None):
-        super().__init__(pid, PieceType.Queen, color, pos)
+        super().__init__(pid, PieceType.QUEEN, color, pos)
 
     def can_move(self, frm, to, board):
         r = Rook('temp', self.color)
@@ -118,7 +105,7 @@ class Queen(Piece):
 
 class King(Piece):
     def __init__(self, pid, color, pos=None):
-        super().__init__(pid, PieceType.King, color, pos)
+        super().__init__(pid, PieceType.KING, color, pos)
 
     def can_move(self, frm, to, board):
         dx = abs(frm[0] - to[0])
@@ -128,10 +115,10 @@ class King(Piece):
 
 class Pawn(Piece):
     def __init__(self, pid, color, pos=None):
-        super().__init__(pid, PieceType.Pawn, color, pos)
+        super().__init__(pid, PieceType.PAWN, color, pos)
 
     def can_move(self, frm, to, board):
-        dir = 1 if self.color == Color.Black else -1
+        dir = 1 if self.color == Color.BLACK else -1
         if to[0] == frm[0] and to[1] == frm[1] + dir:
             return board[to[1]][to[0]] is None
 
