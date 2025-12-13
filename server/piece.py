@@ -1,4 +1,4 @@
-from typing import Tuple
+from __future__ import annotations
 
 from enums import Color, PieceType
 
@@ -13,6 +13,17 @@ class Piece:
         self.move_stack: int = 0
         self.captured: bool = False  # Piece is not captured at the beginning of the game
 
+    @staticmethod
+    def create(pid, piece_type: PieceType, color: Color):
+        return {
+            PieceType.PAWN: Pawn,
+            PieceType.ROOK: Rook,
+            PieceType.BISHOP: Bishop,
+            PieceType.KNIGHT: Knight,
+            PieceType.QUEEN: Queen,
+            PieceType.KING: King,
+        }[piece_type](pid, color)
+
     def to_json(self):
         return {
             "id": self.id,
@@ -25,26 +36,30 @@ class Piece:
         }
 
     # 각 기물 클래스에서 오버라이드
-    def can_move(self, frm, to, board):
+    def can_move(self, frm: Position, to: Position, board):
         raise NotImplementedError("Need to be implemented in subclass")
 
-    def drop(self, pos):
+    def drop(self, pos: Position):
         self.pos = pos
         self.captured = False
         self.stun = 1
         self.move_stack = 0
 
-    def capture(self, target):
+    def capture(self, target: Piece):
         # 만약 스택이 쌓여있는 기물을 잡았을 경우, 그 스택이 잡은 기물에게 이전된다.
         self.stun += target.stun
         self.move_stack += target.move_stack
         target.color = self.color
 
+        # Clear the target piece's position and captured flag
+        target.pos = None
+        target.captured = True
+        target.stun = 0
+        target.move_stack = 0
+
     def end_turn(self):
         # 이동 스텍은 스턴 스텍이 턴을 넘겨서 1씩 사라질 때마다 1씩 늘어난다.
-        if self.captured:
-            return
-        if self.stun > 0:
+        if not self.captured and self.stun > 0:
             self.stun -= 1
             self.move_stack += 1
 

@@ -2,7 +2,7 @@ import copy
 from uuid import uuid4
 
 from enums import Color, PieceType
-from piece import Pawn, Rook, Knight, Bishop, Queen, King
+from piece import Piece
 
 
 class Game:
@@ -21,21 +21,7 @@ class Game:
     def __add_piece(self, ptype, cnt, color):
         for i in range(cnt):
             pid = f"{color}_{ptype.abbr}{i}"
-            piece = None
-
-            if ptype == PieceType.PAWN:
-                piece = Pawn(pid, color)
-            elif ptype == PieceType.ROOK:
-                piece = Rook(pid, color)
-            elif ptype == PieceType.KNIGHT:
-                piece = Knight(pid, color)
-            elif ptype == PieceType.BISHOP:
-                piece = Bishop(pid, color)
-            elif ptype == PieceType.QUEEN:
-                piece = Queen(pid, color)
-            elif ptype == PieceType.KING:
-                piece = King(pid, color)
-
+            piece = Piece.create(pid, ptype, color)
             self.pieces[pid] = piece
             self.hands[color].append(pid)
 
@@ -46,9 +32,10 @@ class Game:
             # rooks, bishops, knights x2
             self.__add_piece(PieceType.ROOK, 2, color)
             self.__add_piece(PieceType.BISHOP, 2, color)
-            # queen 1, king 1
             self.__add_piece(PieceType.KNIGHT, 2, color)
+            # queen 1, king 1
             self.__add_piece(PieceType.QUEEN, 1, color)
+            self.__add_piece(PieceType.KING, 1, color)
 
     def to_json(self):
         return {
@@ -63,8 +50,8 @@ class Game:
         return self.board[y][x] is None
 
     def get_piece_at(self, x, y):
-        _id = self.board[y][x]
-        return self.pieces[_id] if _id else None
+        pid = self.board[y][x]
+        return self.pieces[pid] if pid else None
 
     def get_piece(self, pid):
         return self.pieces.get(pid)
@@ -85,12 +72,15 @@ class Game:
 
         if p.type == PieceType.PAWN:
             # 폰은 각 플레이어 기준 맨 끝 랭크에 착수할 수 없다.
-            if player_color == Color.WHITE and y == 7: return False, "white cannot drop pawn on last rank"
-            if player_color == Color.BLACK and y == 0: return False, "black cannot drop pawn on first rank"
+            if player_color == Color.WHITE and y == 7:
+                return False, "white cannot drop pawn on last rank"
+            if player_color == Color.BLACK and y == 0:
+                return False, "black cannot drop pawn on first rank"
+
             # 폰은 착수 랭크에 따라 스턴 스택이 다르게 쌓이며, 다음과 같다.백 기준으로 랭크 1: 0스턴 스텍 ~ 랭크 7: 6스턴 스텍. 흑은 반대로 랭크 8: 0스턴 스텍 ~ 랭크 2: 6스턴 스텍이다.
             if player_color == Color.WHITE:
                 p.stun = y if y <= 6 else 1
-            else:
+            else:  # Color.BLACK
                 p.stun = (7 - y) if y >= 1 else 1
         else:
             p.stun = max(1, p.stun)
@@ -123,24 +113,22 @@ class Game:
             return False, "illegal move for piece"
 
         target_id = self.board[y2][x2]
+        if target_id is None:
+            return False, "target not found"
+
+        target = self.pieces[target_id]
         is_win = False
 
-        if target_id is not None:
-            target = self.pieces[target_id]
-            if target.color == piece.color:
-                return False, "cannot capture own piece"
+        if target.color == piece.color:
+            return False, "cannot capture own piece"
 
-            # Check for win condition (king capture)
-            if target.type == PieceType.KING:
-                is_win = True
+        # Check for win condition (king capture)
+        if target.type == PieceType.KING:
+            is_win = True
 
-            piece.capture(target)
-            target.pos = None
-            target.captured = True
-            target.stun = 0
-            target.move_stack = 0
-            self.hands[player_color].append(target_id)
-            self.board[y2][x2] = None
+        piece.capture(target)
+        self.hands[player_color].append(target_id)
+        self.board[y2][x2] = None
 
         # move
         self.board[y1][x1] = None
