@@ -8,6 +8,7 @@ export const useGame = () => {
   const [gameState, setGameState] = useState(null);
   const [log, setLog] = useState([]);
   const [selectedPiece, setSelectedPiece] = useState(null);
+  const [legalMoves, setLegalMoves] = useState([]);
   // const [confirmedPiece, setConfirmedPiece] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [gameOver, setGameOver] = useState(false);
@@ -23,12 +24,14 @@ export const useGame = () => {
     socket.on("move_accepted", (d) => {
       setLog(l => [`Move accepted: ${JSON.stringify(d)}`, ...l]);
       setSelectedPiece(null);
+      setLegalMoves([]);
       // setConfirmedPiece(null);
     });
     socket.on("move_rejected", (d) => setLog(l => [`Move rejected: ${d.reason}`, ...l]));
     socket.on("drop_accepted", (d) => {
       setLog(l => [`Drop accepted: ${JSON.stringify(d)}`, ...l]);
       setSelectedPiece(null);
+      setLegalMoves([]);
       // setConfirmedPiece(null);
     });
     socket.on("drop_rejected", (d) => setLog(l => [`Drop rejected: ${d.reason}`, ...l]));
@@ -40,6 +43,9 @@ export const useGame = () => {
       setGameOver(true);
       setWinner(data.winner);
       setSelectedPiece(null);
+    });
+    socket.on("legal_moves", (data) => {
+      setLegalMoves(data.moves);
     });
 
     return () => {
@@ -53,6 +59,7 @@ export const useGame = () => {
       socket.off("selection_cancelled");
       socket.off("turn_ended");
       socket.off("game_end");
+      socket.off("legal_moves");
     };
   }, []);
 
@@ -78,6 +85,7 @@ export const useGame = () => {
       else {
         if (piece && piece.id === selectedPiece.id) {
           setSelectedPiece(null);
+          setLegalMoves([]);
           return;
         }
         console.log(`Requesting move of ${selectedPiece.id} from ${selectedPiece.pos} to (${x}, ${y})`);
@@ -94,6 +102,7 @@ export const useGame = () => {
       if (piece && piece.color === gameState.turn) {
         console.log("Selected piece on board:", piece);
         setSelectedPiece(piece);
+        socket.emit("get_legal_moves", { piece_id: piece.id });
       }
     }
   };
@@ -106,9 +115,11 @@ export const useGame = () => {
     }
     if (selectedPiece && selectedPiece.id === piece.id) {
       setSelectedPiece(null); // Deselect if clicking the same hand piece
+      setLegalMoves([]);
     } else {
       console.log("Selected piece from hand:", piece);
       setSelectedPiece(piece);
+      socket.emit("get_legal_moves", { piece_id: piece.id });
     }
   };
 
@@ -125,7 +136,8 @@ export const useGame = () => {
       // setConfirmedPiece(selectedPiece);
       socket.emit("stack_add", { piece_id: selectedPiece.id });
       setSelectedPiece(null);
+      setLegalMoves([]);
     }
   }
-  return { gameState, log, selectedPiece, gameId, gameOver, winner, handleSelect, handleSelectFromHand, endTurn, toggleConfirmSelection };
+  return { gameState, log, selectedPiece, legalMoves, gameId, gameOver, winner, handleSelect, handleSelectFromHand, endTurn, toggleConfirmSelection };
 };

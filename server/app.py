@@ -34,6 +34,9 @@ class Piece:
         print("오버라이드 필요")
         return False
 
+    def get_possible_moves(self, frm, board):
+        return []
+
     def drop(self, pos):
         self.pos = pos
         self.captured = False
@@ -62,6 +65,17 @@ class Knight(Piece):
         dx = abs(frm[0]-to[0]); dy = abs(frm[1]-to[1])
         return (dx==1 and dy==2) or (dx==2 and dy==1)
 
+    def get_possible_moves(self, frm, board):
+        moves = []
+        x, y = frm
+        deltas = [(-2, -1), (-2, 1), (-1, -2), (-1, 2),
+                  (1, -2), (1, 2), (2, -1), (2, 1)]
+        for dx, dy in deltas:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < 8 and 0 <= ny < 8:
+                moves.append((nx, ny))
+        return moves
+
 class Rook(Piece):
     def __init__(self, pid, color, pos=None):
         super().__init__(pid, 'rook', color, pos)
@@ -75,6 +89,22 @@ class Rook(Piece):
             if board[y][x] is not None: return False
             x+=dx; y+=dy
         return True
+
+    def get_possible_moves(self, frm, board):
+        moves = []
+        x, y = frm
+        directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+            while 0 <= nx < 8 and 0 <= ny < 8:
+                if board[ny][nx] is not None:
+                    if board[ny][nx].color != self.color:
+                        moves.append((nx, ny))
+                    break
+                moves.append((nx, ny))
+                nx += dx
+                ny += dy
+        return moves
 
 class Bishop(Piece):
     def __init__(self, pid, color, pos=None):
@@ -91,6 +121,22 @@ class Bishop(Piece):
             x+=sx; y+=sy
         return True
 
+    def get_possible_moves(self, frm, board):
+        moves = []
+        x, y = frm
+        directions = [(1, 1), (1, -1), (-1, 1), (-1, -1)]
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+            while 0 <= nx < 8 and 0 <= ny < 8:
+                if board[ny][nx] is not None:
+                    if board[ny][nx].color != self.color:
+                        moves.append((nx, ny))
+                    break
+                moves.append((nx, ny))
+                nx += dx
+                ny += dy
+        return moves
+
 class Queen(Piece):
     def __init__(self, pid, color, pos=None):
         super().__init__(pid, 'queen', color, pos)
@@ -99,6 +145,11 @@ class Queen(Piece):
         r = Rook('temp',self.color); b = Bishop('temp',self.color)
         return r.can_move(frm,to,board) or b.can_move(frm,to,board)
 
+    def get_possible_moves(self, frm, board):
+        r = Rook('temp', self.color)
+        b = Bishop('temp', self.color)
+        return r.get_possible_moves(frm, board) + b.get_possible_moves(frm, board)
+
 class King(Piece):
     def __init__(self, pid, color, pos=None):
         super().__init__(pid, 'king', color, pos)
@@ -106,6 +157,18 @@ class King(Piece):
     def can_move(self, frm, to, board):
         dx = abs(frm[0]-to[0]); dy = abs(frm[1]-to[1])
         return max(dx,dy) == 1
+
+    def get_possible_moves(self, frm, board):
+        moves = []
+        x, y = frm
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx == 0 and dy == 0:
+                    continue
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < 8 and 0 <= ny < 8:
+                    moves.append((nx, ny))
+        return moves
 
 class Pawn(Piece):
     def __init__(self, pid, color, pos=None):
@@ -120,6 +183,23 @@ class Pawn(Piece):
             target = board[to[1]][to[0]]
             return (target is not None) and (target.color != self.color)
         return False
+
+    def get_possible_moves(self, frm, board):
+        moves = []
+        x, y = frm
+        dir = 1 if self.color == 'b' else -1
+
+        # Forward move
+        if 0 <= y + dir < 8 and board[y + dir][x] is None:
+            moves.append((x, y + dir))
+
+        # Capture moves
+        for dx in [-1, 1]:
+            if 0 <= x + dx < 8 and 0 <= y + dir < 8:
+                target = board[y + dir][x + dx]
+                if target is not None and target.color != self.color:
+                    moves.append((x + dx, y + dir))
+        return moves
 
 class Game:
     def __init__(self):
@@ -267,6 +347,40 @@ class Game:
                 king_exists = True
         return king_exists
 
+    def get_legal_moves(self, piece_id):
+        piece = self.get_piece(piece_id)
+        if not piece:
+            return []
+
+        if piece.captured: # Dropping a captured piece
+            moves = []
+            for y in range(8):
+                for x in range(8):
+                    if self.pos_empty(x, y):
+                        # Simplified drop validation, real implementation would have more rules
+                        if piece.type == 'pawn':
+                            if piece.color == 'w' and y == 7: continue
+                            if piece.color == 'b' and y == 0: continue
+                        moves.append([x, y])
+            return moves
+
+        if piece.stun > 0 or piece.move_stack < 1:
+            return []
+
+        legal_moves = []
+        frm = piece.pos
+        possible_moves = piece.get_possible_moves(frm, self.board_pieces())
+        
+        for to in possible_moves:
+            target_piece = self.get_piece_at(to[0], to[1])
+            if target_piece and target_piece.color == piece.color:
+                continue
+
+            if self.safe_after_move(piece_id, frm, to, piece.color):
+                legal_moves.append(to)
+        
+        return legal_moves
+
     def end_turn(self):
         for id,p in self.pieces.items():
             p.end_turn()
@@ -410,6 +524,20 @@ def on_stack_add(data):
     p.stun += 1
     game.action_done[p.color] = True
     socketio.emit('game_state', game.to_json(), to=game.id)
+
+@socketio.on('get_legal_moves')
+def on_get_legal_moves(data):
+    sid = request.sid
+    game = get_game_for_player(sid)
+    if not game:
+        return
+
+    piece_id = data.get('piece_id')
+    if not piece_id:
+        return
+
+    moves = game.get_legal_moves(piece_id)
+    emit('legal_moves', {'moves': moves}, to=sid)
 
 @socketio.on('disconnect')
 def on_disconnect():

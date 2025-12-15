@@ -32,6 +32,7 @@ export default function App() {
     log,
     selectedPiece,
     confirmedPiece,
+    legalMoves,
     gameId,
     gameOver,
     winner,
@@ -56,7 +57,7 @@ export default function App() {
       <div style={styles.gameArea}>
         <h2>Stasis Chess</h2>
         <p>Game ID: {gameId}</p>
-        <Board pieces={gameState.pieces} onSelect={handleSelect} selectedPiece={selectedPiece} />
+        <Board pieces={gameState.pieces} onSelect={handleSelect} selectedPiece={selectedPiece} legalMoves={legalMoves} />
         <div style={styles.turnInfo}>
           <h3>Turn: {gameState.turn === 'w' ? 'White' : 'Black'}</h3>
           <button

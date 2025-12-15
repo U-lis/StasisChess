@@ -22,22 +22,36 @@ const staticCellStyle = {
   alignItems: 'center'
 };
 
-const Cell = ({ x, y, piece, onSelect, isSelected }) => {
+const Cell = ({ x, y, piece, onSelect, isSelected, isLegalMove }) => {
   const isBlack = (x + y) % 2 === 1;
   const cellColor = isBlack ? '#b58863' : '#f0d9b5';
   const cellStyle = {
     ...staticCellStyle,
     backgroundColor: cellColor,
+    position: 'relative',
+  };
+
+  const legalMoveIndicator = {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: '20px',
+    height: '20px',
+    backgroundColor: 'yellow',
+    borderRadius: '50%',
+    opacity: 0.5,
   };
 
   return (
     <div style={cellStyle} onClick={() => onSelect(x, y, piece)}>
+      {isLegalMove && <div style={legalMoveIndicator}></div>}
       {piece && <Piece type={piece.type} color={piece.color} stun={piece.stun} moveStack={piece.move_stack} isSelected={isSelected} />}
     </div>
   );
 };
 
-export default function Board({ pieces, onSelect, selectedPiece }) {
+export default function Board({ pieces, onSelect, selectedPiece, legalMoves }) {
   const board = Array(8).fill(null).map(() => Array(8).fill(null));
   for (const pieceId in pieces) {
     const piece = pieces[pieceId];
@@ -49,6 +63,11 @@ export default function Board({ pieces, onSelect, selectedPiece }) {
     }
   }
 
+  const isLegalMove = (x, y) => {
+    if (!legalMoves) return false;
+    return legalMoves.some(move => move[0] === x && move[1] === y);
+  }
+
   return (
     <div style={style}>
       {ranks.map((rank, y_idx) =>
@@ -58,7 +77,7 @@ export default function Board({ pieces, onSelect, selectedPiece }) {
           const x = x_idx;
           const pieceOnBoard = board[y][x];
           const isSelected = selectedPiece && pieceOnBoard && selectedPiece.id === pieceOnBoard.id;
-          return <Cell key={`${x}-${y}`} x={x} y={y} piece={pieceOnBoard} onSelect={onSelect} isSelected={isSelected} />;
+          return <Cell key={`${x}-${y}`} x={x} y={y} piece={pieceOnBoard} onSelect={onSelect} isSelected={isSelected} isLegalMove={isLegalMove(x, y)} />;
         })
       )}
     </div>
