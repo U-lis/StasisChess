@@ -6,5 +6,6 @@ export default defineConfig({
     plugins: [plugin()],
     server: {
         port: 51350,
+        allowedHosts: ["laila-centrosymmetric-overtartly.ngrok-free.dev"]
     }
 })
